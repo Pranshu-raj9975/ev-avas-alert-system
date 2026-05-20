@@ -1,0 +1,104 @@
+#define TRIG_PIN 5
+#define ECHO_PIN 18
+#define BUZZER_PIN 23
+
+#define GREEN_LED 25
+#define YELLOW_LED 26
+#define RED_LED 27
+
+#define MIC_PIN 34  // analog input
+
+#define PWM_CHANNEL 0
+#define PWM_RESOLUTION 8
+
+long duration;
+float distance;
+
+void setup() {
+
+  Serial.begin(115200);
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(YELLOW_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+
+  ledcSetup(PWM_CHANNEL, 2000, PWM_RESOLUTION);
+  ledcAttachPin(BUZZER_PIN, PWM_CHANNEL);
+}
+
+float getDistance(){
+
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  duration = pulseIn(ECHO_PIN, HIGH, 30000);
+
+  float dist = duration * 0.034 / 2;
+
+  if(dist <= 0 || dist > 400){
+    dist = 400;
+  }
+
+  return dist;
+}
+
+void loop(){
+
+  distance = getDistance();
+
+  int soundLevel = analogRead(MIC_PIN);  // 0–4095
+
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.print(" | Sound: ");
+  Serial.println(soundLevel);
+
+  int toneFreq = 0;
+  int beepDelay = 0;
+
+  // LED reset
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(YELLOW_LED, LOW);
+  digitalWrite(RED_LED, LOW);
+
+  // Distance logic
+  if(distance > 200){
+    digitalWrite(GREEN_LED, HIGH);
+    ledcWriteTone(PWM_CHANNEL, 0);
+  }
+  else if(distance > 100){
+    digitalWrite(YELLOW_LED, HIGH);
+    toneFreq = 800;
+    beepDelay = 700;
+  }
+  else if(distance > 50){
+    digitalWrite(YELLOW_LED, HIGH);
+    toneFreq = 1200;
+    beepDelay = 350;
+  }
+  else{
+    digitalWrite(RED_LED, HIGH);
+    toneFreq = 2000;
+    beepDelay = 120;
+  }
+
+  // 🔥 ADAPTIVE SOUND (key AVAS feature)
+  int volume = map(soundLevel, 0, 4095, 50, 255);
+
+  if(toneFreq > 0){
+    ledcWriteTone(PWM_CHANNEL, toneFreq);
+    ledcWrite(PWM_CHANNEL, volume);  // control loudness
+
+    delay(beepDelay);
+
+    ledcWriteTone(PWM_CHANNEL, 0);
+    delay(beepDelay);
+  }
+}
